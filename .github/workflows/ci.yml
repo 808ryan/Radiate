@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Run shared protocol tests
+        run: >-
+          xcodebuild test
+          -project RadiateBenchmark.xcodeproj
+          -scheme RadiateMac
+          -destination 'platform=macOS'
+          -derivedDataPath DerivedData/Tests
+          CODE_SIGNING_ALLOWED=NO
+
+      - name: Compile iPhone receiver
+        run: >-
+          xcodebuild build
+          -project RadiateBenchmark.xcodeproj
+          -scheme RadiateReceiver
+          -configuration Debug
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath DerivedData/iOS
+          CODE_SIGNING_ALLOWED=NO
+
+      - name: Build unsigned Mac app
+        run: >-
+          xcodebuild build
+          -project RadiateBenchmark.xcodeproj
+          -scheme RadiateMac
+          -configuration Release
+          -destination 'platform=macOS'
+          -derivedDataPath DerivedData/macOS
+          CODE_SIGNING_ALLOWED=NO
+
+      - name: Package unsigned Mac app
+        run: >-
+          ditto -c -k --sequesterRsrc --keepParent
+          DerivedData/macOS/Build/Products/Release/Radiate.app
+          Radiate-macOS-unsigned.zip
+
+      - name: Upload unsigned Mac app
+        uses: actions/upload-artifact@v4
+        with:
+          name: Radiate-macOS-unsigned-${{ github.sha }}
+          path: Radiate-macOS-unsigned.zip
+          if-no-files-found: error
+          retention-days: 14

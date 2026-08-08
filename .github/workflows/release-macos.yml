@@ -1,0 +1,180 @@
+name: Release macOS
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build unsigned app
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build release app
+        run: >-
+          xcodebuild build
+          -project RadiateBenchmark.xcodeproj
+          -scheme RadiateMac
+          -configuration Release
+          -destination 'platform=macOS'
+          -derivedDataPath DerivedData/Release
+          CODE_SIGNING_ALLOWED=NO
+
+      - name: Package app for signing job
+        run: >-
+          ditto -c -k --sequesterRsrc --keepParent
+          DerivedData/Release/Build/Products/Release/Radiate.app
+          Radiate-unsigned.zip
+
+      - name: Upload intermediate app
+        uses: actions/upload-artifact@v4
+        with:
+          name: Radiate-unsigned-for-signing
+          path: Radiate-unsigned.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  sign-and-notarize:
+    name: Sign and notarize
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 30
+    environment: release
+
+    steps:
+      - name: Check out signing configuration
+        uses: actions/checkout@v4
+
+      - name: Download unsigned app
+        uses: actions/download-artifact@v4
+        with:
+          name: Radiate-unsigned-for-signing
+
+      - name: Unpack app
+        run: ditto -x -k Radiate-unsigned.zip .
+
+      - name: Import Developer ID certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$CERTIFICATE_BASE64"
+          test -n "$CERTIFICATE_PASSWORD"
+
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+          keychain_path="$RUNNER_TEMP/radiate-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+
+          printf '%s' "$CERTIFICATE_BASE64" | base64 --decode > "$certificate_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$keychain_path"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "$keychain_password" \
+            "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+
+      - name: Sign application
+        run: |
+          set -euo pipefail
+          keychain_path="$RUNNER_TEMP/radiate-signing.keychain-db"
+          signing_identity="$(security find-identity -v -p codesigning "$keychain_path" | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' | head -n 1)"
+          test -n "$signing_identity"
+
+          xattr -cr Radiate.app
+          codesign \
+            --force \
+            --options runtime \
+            --timestamp \
+            --entitlements Config/RadiateMac.entitlements \
+            --sign "$signing_identity" \
+            Radiate.app
+          codesign --verify --deep --strict --verbose=2 Radiate.app
+
+      - name: Create and sign disk image
+        run: |
+          set -euo pipefail
+          keychain_path="$RUNNER_TEMP/radiate-signing.keychain-db"
+          signing_identity="$(security find-identity -v -p codesigning "$keychain_path" | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' | head -n 1)"
+
+          mkdir -p dmg-root
+          ditto Radiate.app dmg-root/Radiate.app
+          ln -s /Applications dmg-root/Applications
+          hdiutil create \
+            -volname Radiate \
+            -srcfolder dmg-root \
+            -ov \
+            -format UDZO \
+            Radiate-macOS.dmg
+          codesign --force --timestamp --sign "$signing_identity" Radiate-macOS.dmg
+
+      - name: Notarize and staple disk image
+        env:
+          NOTARY_KEY_BASE64: ${{ secrets.APPLE_NOTARY_KEY_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$NOTARY_KEY_BASE64"
+          test -n "$NOTARY_KEY_ID"
+          test -n "$NOTARY_ISSUER_ID"
+
+          notary_key_path="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$NOTARY_KEY_BASE64" | base64 --decode > "$notary_key_path"
+          chmod 600 "$notary_key_path"
+
+          xcrun notarytool submit Radiate-macOS.dmg \
+            --key "$notary_key_path" \
+            --key-id "$NOTARY_KEY_ID" \
+            --issuer "$NOTARY_ISSUER_ID" \
+            --wait
+          xcrun stapler staple Radiate-macOS.dmg
+          xcrun stapler validate Radiate-macOS.dmg
+
+      - name: Upload notarized disk image
+        uses: actions/upload-artifact@v4
+        with:
+          name: Radiate-macOS-notarized
+          path: Radiate-macOS.dmg
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach disk image to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${GITHUB_REF_NAME}"
+          Radiate-macOS.dmg
+          --generate-notes
+          --title "Radiate ${GITHUB_REF_NAME}"
+
+      - name: Remove temporary signing material
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/radiate-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/AuthKey.p8"

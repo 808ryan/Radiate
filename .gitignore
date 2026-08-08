@@ -1,0 +1,32 @@
+.DS_Store
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+RadiateBenchmark.xcodeproj/
+
+# Local configuration and environment secrets
+.env
+.env.*
+!.env.example
+Config/Local.xcconfig
+Config/Secrets.xcconfig
+
+# Apple signing and provisioning material
+*.cer
+*.key
+*.p8
+*.p12
+*.mobileprovision
+*.provisionprofile
+ExportOptions.plist
+
+# Locally exported builds and symbols
+*.ipa
+*.xcarchive/
+*.dSYM/
+*.dSYM.zip
+
+# Private captures and unredacted benchmark data
+Private/
+Artifacts/Private/
