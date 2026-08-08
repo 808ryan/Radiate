@@ -42,7 +42,7 @@ jobs:
           Radiate-unsigned.zip
 
       - name: Upload intermediate app
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Radiate-unsigned-for-signing
           path: Radiate-unsigned.zip
@@ -61,7 +61,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Download unsigned app
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: Radiate-unsigned-for-signing
 
@@ -156,7 +156,7 @@ jobs:
           xcrun stapler validate Radiate-macOS.dmg
 
       - name: Upload notarized disk image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Radiate-macOS-notarized
           path: Radiate-macOS.dmg

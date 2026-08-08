@@ -65,7 +65,7 @@ jobs:
           Radiate-macOS-unsigned.zip
 
       - name: Upload unsigned Mac app
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Radiate-macOS-unsigned-${{ github.sha }}
           path: Radiate-macOS-unsigned.zip
