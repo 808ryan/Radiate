@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -58,7 +58,7 @@ jobs:
 
     steps:
       - name: Check out signing configuration
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download unsigned app
         uses: actions/download-artifact@v4
