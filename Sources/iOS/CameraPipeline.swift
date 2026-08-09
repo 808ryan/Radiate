@@ -8,9 +8,11 @@ final class CameraPipeline: NSObject, ObservableObject, AVCaptureVideoDataOutput
 
     @Published private(set) var isRunning = false
     @Published private(set) var isCalibrated = false
+    @Published private(set) var isDetectingScreen = false
     @Published private(set) var status = "Starting camera…"
     @Published private(set) var captureFormat = "Selecting high-speed format"
     @Published private(set) var metrics = BenchmarkMetrics()
+    @Published private(set) var previewDevice: AVCaptureDevice?
 
     private let sessionQueue = DispatchQueue(label: "com.radiate.camera.session")
     private let processingQueue = DispatchQueue(
@@ -21,6 +23,7 @@ final class CameraPipeline: NSObject, ObservableObject, AVCaptureVideoDataOutput
     private var workingMetrics = BenchmarkMetrics()
     private var lastPublishTime: TimeInterval = 0
     private var cameraDevice: AVCaptureDevice?
+    private var videoOutput: AVCaptureVideoDataOutput?
     private var hasReceivedFrames = false
 
     func start() {
@@ -50,6 +53,7 @@ final class CameraPipeline: NSObject, ObservableObject, AVCaptureVideoDataOutput
             self?.publishMetrics(force: true)
             DispatchQueue.main.async {
                 self?.isCalibrated = false
+                self?.isDetectingScreen = false
                 self?.status = "Aim at the complete white border"
             }
         }
@@ -61,8 +65,19 @@ final class CameraPipeline: NSObject, ObservableObject, AVCaptureVideoDataOutput
             self?.hasReceivedFrames = false
             DispatchQueue.main.async {
                 self?.isCalibrated = false
+                self?.isDetectingScreen = true
                 self?.status = "Detecting the screen…"
             }
+        }
+    }
+
+    func setCaptureRotationAngle(_ angle: CGFloat) {
+        sessionQueue.async { [weak self] in
+            guard let connection = self?.videoOutput?.connection(with: .video),
+                  connection.isVideoRotationAngleSupported(angle),
+                  connection.videoRotationAngle != angle
+            else { return }
+            connection.videoRotationAngle = angle
         }
     }
 
@@ -86,15 +101,19 @@ final class CameraPipeline: NSObject, ObservableObject, AVCaptureVideoDataOutput
         switch decoder.decode(pixelBuffer) {
         case .waitingForCalibration:
             break
+        case .detectingScreen:
+            break
         case .calibrationFailed:
             DispatchQueue.main.async { [weak self] in
                 self?.isCalibrated = false
+                self?.isDetectingScreen = false
                 self?.status = "Screen not found — keep the full border visible"
             }
         case .calibrated:
             lockCameraForBenchmark()
             DispatchQueue.main.async { [weak self] in
                 self?.isCalibrated = true
+                self?.isDetectingScreen = false
                 self?.status = "Calibrated — waiting for valid frames"
             }
         case .invalidHeader:
@@ -133,6 +152,7 @@ final class CameraPipeline: NSObject, ObservableObject, AVCaptureVideoDataOutput
                 DispatchQueue.main.async {
                     self.isRunning = true
                     self.captureFormat = formatSummary
+                    self.previewDevice = self.cameraDevice
                     self.status = "Aim at the complete white border"
                 }
             } catch {
@@ -189,11 +209,7 @@ final class CameraPipeline: NSObject, ObservableObject, AVCaptureVideoDataOutput
         output.setSampleBufferDelegate(self, queue: processingQueue)
         guard session.canAddOutput(output) else { throw CameraError.cannotAddOutput }
         session.addOutput(output)
-
-        if let connection = output.connection(with: .video),
-           connection.isVideoRotationAngleSupported(0) {
-            connection.videoRotationAngle = 0
-        }
+        videoOutput = output
 
         return "\(selected.width) × \(selected.height) at \(Int(frameRate)) fps"
     }

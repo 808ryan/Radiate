@@ -4,6 +4,7 @@ import SwiftUI
 struct MetalGridView: NSViewRepresentable {
     let profile: BenchmarkProfile
     let isRunning: Bool
+    let runGeneration: UInt64
     let preferredFramesPerSecond: Int
     let displayFramesPerSymbol: Int
 
@@ -30,6 +31,7 @@ struct MetalGridView: NSViewRepresentable {
             renderer.update(
                 profile: profile,
                 isRunning: isRunning,
+                runGeneration: runGeneration,
                 displayFramesPerSymbol: displayFramesPerSymbol
             )
         }
@@ -42,8 +44,16 @@ struct MetalGridView: NSViewRepresentable {
         context.coordinator.renderer?.update(
             profile: profile,
             isRunning: isRunning,
+            runGeneration: runGeneration,
             displayFramesPerSymbol: displayFramesPerSymbol
         )
+
+        // A full-screen transmitter can be occluded while the control window is
+        // active in another Space. Restart its display link and force one draw
+        // so start/stop changes cannot leave the previous frame on screen.
+        view.isPaused = true
+        view.draw()
+        view.isPaused = false
     }
 
     final class Coordinator {

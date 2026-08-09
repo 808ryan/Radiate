@@ -3,7 +3,8 @@ import SwiftUI
 @MainActor
 final class SenderModel: ObservableObject {
     @Published var profile: BenchmarkProfile = .balanced
-    @Published var isRunning = false
+    @Published private(set) var isRunning = false
+    @Published private(set) var runGeneration: UInt64 = 0
     @Published var targetDisplayRate = 120
     @Published var displayFramesPerSymbol = 2
 
@@ -15,6 +16,22 @@ final class SenderModel: ObservableObject {
         profile.rawBytesPerSecond(symbolRate: targetSymbolRate)
     }
 
-    func start() { isRunning = true }
-    func stop() { isRunning = false }
+    func start() {
+        guard !isRunning else { return }
+        runGeneration &+= 1
+        isRunning = true
+    }
+
+    func stop() {
+        guard isRunning else { return }
+        isRunning = false
+    }
+
+    func toggleRunning() {
+        if isRunning {
+            stop()
+        } else {
+            start()
+        }
+    }
 }

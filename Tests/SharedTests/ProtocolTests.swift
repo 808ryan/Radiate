@@ -32,4 +32,20 @@ final class ProtocolTests: XCTestCase {
         XCTAssertEqual(PRBS.word(sequence: 1, cellIndex: 0), 0x6889_90C0)
         XCTAssertEqual(PRBS.word(sequence: 42, cellIndex: 17), 0xE6B3_7130)
     }
+
+    @MainActor
+    func testEachSenderStartCreatesANewRunGeneration() {
+        let sender = SenderModel()
+
+        sender.start()
+        let firstGeneration = sender.runGeneration
+        XCTAssertTrue(sender.isRunning)
+
+        sender.stop()
+        XCTAssertFalse(sender.isRunning)
+
+        sender.start()
+        XCTAssertTrue(sender.isRunning)
+        XCTAssertEqual(sender.runGeneration, firstGeneration + 1)
+    }
 }

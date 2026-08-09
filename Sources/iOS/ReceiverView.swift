@@ -6,7 +6,11 @@ struct ReceiverView: View {
 
     var body: some View {
         ZStack {
-            CameraPreview(session: camera.session)
+            CameraPreview(
+                session: camera.session,
+                device: camera.previewDevice,
+                onCaptureRotationAngleChange: camera.setCaptureRotationAngle
+            )
                 .ignoresSafeArea()
 
             LinearGradient(
@@ -63,9 +67,18 @@ struct ReceiverView: View {
             Button {
                 camera.requestScreenDetection()
             } label: {
-                Label("Detect Screen", systemImage: "viewfinder")
+                if camera.isDetectingScreen {
+                    HStack(spacing: 7) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Detecting…")
+                    }
+                } else {
+                    Label("Detect Screen", systemImage: "viewfinder")
+                }
             }
             .buttonStyle(.borderedProminent)
+            .disabled(!camera.isRunning || camera.isDetectingScreen)
         }
         .padding(14)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))

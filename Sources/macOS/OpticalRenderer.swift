@@ -15,6 +15,7 @@ private struct GridUniforms {
 private struct RenderConfiguration {
     var profile: BenchmarkProfile = .balanced
     var isRunning = false
+    var runGeneration: UInt64 = 0
     var displayFramesPerSymbol = 2
 }
 
@@ -24,7 +25,7 @@ final class OpticalRenderer: NSObject, MTKViewDelegate {
     private let lock = OSAllocatedUnfairLock(initialState: RenderConfiguration())
     private var sequence: UInt32 = 0
     private var heldDisplayFrames = 0
-    private var wasRunning = false
+    private var renderedRunGeneration: UInt64 = 0
 
     init?(device: MTLDevice) {
         guard let commandQueue = device.makeCommandQueue(),
@@ -50,11 +51,13 @@ final class OpticalRenderer: NSObject, MTKViewDelegate {
     func update(
         profile: BenchmarkProfile,
         isRunning: Bool,
+        runGeneration: UInt64,
         displayFramesPerSymbol: Int
     ) {
         lock.withLock {
             $0.profile = profile
             $0.isRunning = isRunning
+            $0.runGeneration = runGeneration
             $0.displayFramesPerSymbol = max(1, displayFramesPerSymbol)
         }
     }
@@ -62,18 +65,19 @@ final class OpticalRenderer: NSObject, MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     func draw(in view: MTKView) {
+        let configuration = lock.withLock { $0 }
+        if configuration.isRunning,
+           configuration.runGeneration != renderedRunGeneration {
+            sequence = 0
+            heldDisplayFrames = 0
+            renderedRunGeneration = configuration.runGeneration
+        }
+
         guard let passDescriptor = view.currentRenderPassDescriptor,
               let drawable = view.currentDrawable,
               let commandBuffer = commandQueue.makeCommandBuffer(),
               let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDescriptor)
         else { return }
-
-        let configuration = lock.withLock { $0 }
-        if configuration.isRunning && !wasRunning {
-            sequence = 0
-            heldDisplayFrames = 0
-        }
-        wasRunning = configuration.isRunning
 
         var uniforms = GridUniforms(
             viewportSize: SIMD2(Float(view.drawableSize.width), Float(view.drawableSize.height)),

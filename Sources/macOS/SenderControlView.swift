@@ -52,7 +52,7 @@ struct SenderControlView: View {
                     Spacer()
 
                     Button(sender.isRunning ? "Stop Benchmark" : "Start Benchmark") {
-                        sender.isRunning.toggle()
+                        sender.toggleRunning()
                     }
                     .keyboardShortcut(.space, modifiers: [])
                     .buttonStyle(.borderedProminent)

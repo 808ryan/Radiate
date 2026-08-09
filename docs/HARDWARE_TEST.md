@@ -12,8 +12,9 @@
    green window button to enter full screen.
 5. Set both apps to **Safe**. Before starting the benchmark, point the iPhone at
    the screen in landscape and keep the complete white border in view.
-6. Tap **Detect Screen** on the iPhone. Once it reports calibration, start the
-   benchmark on the Mac.
+6. Tap **Detect Screen** on the iPhone while the Mac shows the static calibration
+   border. Once it reports calibration, start the benchmark from either the Mac
+   control window or the transmitter toolbar.
 
 If the receiver never reports valid frames, stop the Mac benchmark, detect the
 static border again, and restart. Make sure both devices show the same profile.

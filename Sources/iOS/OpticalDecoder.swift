@@ -4,6 +4,7 @@ import Vision
 
 enum OpticalDecodeResult {
     case waitingForCalibration
+    case detectingScreen
     case calibrationFailed
     case calibrated
     case invalidHeader
@@ -14,7 +15,7 @@ enum OpticalDecodeResult {
 final class OpticalDecoder {
     private var profile: BenchmarkProfile = .balanced
     private var sampleMap: SampleMap?
-    private var shouldDetectScreen = false
+    private var screenDetectionDeadline: TimeInterval?
     private var lastSequence: UInt32?
 
     var isCalibrated: Bool { sampleMap != nil }
@@ -23,11 +24,12 @@ final class OpticalDecoder {
         guard self.profile != profile else { return }
         self.profile = profile
         sampleMap = nil
+        screenDetectionDeadline = nil
         lastSequence = nil
     }
 
     func requestScreenDetection() {
-        shouldDetectScreen = true
+        screenDetectionDeadline = ProcessInfo.processInfo.systemUptime + 2.0
         sampleMap = nil
         lastSequence = nil
     }
@@ -37,19 +39,24 @@ final class OpticalDecoder {
     }
 
     func decode(_ pixelBuffer: CVPixelBuffer) -> OpticalDecodeResult {
-        if shouldDetectScreen {
-            shouldDetectScreen = false
-            guard let quadrilateral = detectScreen(in: pixelBuffer),
-                  let map = SampleMap(
+        if let deadline = screenDetectionDeadline {
+            if let quadrilateral = detectScreen(in: pixelBuffer),
+               let map = SampleMap(
                     profile: profile,
                     quadrilateral: quadrilateral,
                     pixelWidth: CVPixelBufferGetWidthOfPlane(pixelBuffer, 0),
                     pixelHeight: CVPixelBufferGetHeightOfPlane(pixelBuffer, 0)
-                  )
-            else { return .calibrationFailed }
+               ) {
+                screenDetectionDeadline = nil
+                sampleMap = map
+                return .calibrated
+            }
 
-            sampleMap = map
-            return .calibrated
+            if ProcessInfo.processInfo.systemUptime >= deadline {
+                screenDetectionDeadline = nil
+                return .calibrationFailed
+            }
+            return .detectingScreen
         }
 
         guard let sampleMap else { return .waitingForCalibration }
@@ -95,11 +102,11 @@ final class OpticalDecoder {
     private func detectScreen(in pixelBuffer: CVPixelBuffer) -> ScreenQuadrilateral? {
         let request = VNDetectRectanglesRequest()
         request.maximumObservations = 1
-        request.minimumConfidence = 0.65
+        request.minimumConfidence = 0.5
         request.minimumAspectRatio = 0.35
         request.maximumAspectRatio = 1.0
-        request.minimumSize = 0.45
-        request.quadratureTolerance = 30
+        request.minimumSize = 0.35
+        request.quadratureTolerance = 35
 
         let handler = VNImageRequestHandler(
             cvPixelBuffer: pixelBuffer,
