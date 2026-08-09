@@ -40,7 +40,8 @@ In Xcode:
 3. Run `RadiateReceiver` on the connected iPhone.
 4. Open the transmitter window, make it full screen, and select the same
    profile on both devices.
-5. Hold the iPhone in landscape so the complete white screen border is visible,
+5. Hold the iPhone in landscape so the complete white calibration target and
+   its surrounding black margin are visible,
    tap **Detect screen**, and then tap **Start benchmark** on the Mac.
 
 See [docs/HARDWARE_TEST.md](docs/HARDWARE_TEST.md) for the repeatable test

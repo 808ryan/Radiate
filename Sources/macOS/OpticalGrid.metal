@@ -94,7 +94,10 @@ fragment float4 gridFragment(VertexOut input [[stage_in]],
     }
 
     if (uniforms.running == 0u) {
-        return float4(0.0, 0.0, 0.0, 1.0);
+        // A filled target gives Vision a much stronger outer rectangle than a
+        // thin outline captured from a bright, reflective display. Its outer
+        // edge is unchanged, so the running grid uses the same homography.
+        return float4(1.0, 1.0, 1.0, 1.0);
     }
 
     float2 gridUV = (input.uv - inset) / (1.0 - 2.0 * inset);

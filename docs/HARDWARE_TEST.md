@@ -11,9 +11,10 @@
 4. Run `RadiateMac`. Open the transmitter and use its toolbar control or the
    green window button to enter full screen.
 5. Set both apps to **Safe**. Before starting the benchmark, point the iPhone at
-   the screen in landscape and keep the complete white border in view.
+   the screen in landscape and keep the complete white calibration target in
+   view, including the black margin around it.
 6. Tap **Detect Screen** on the iPhone while the Mac shows the static calibration
-   border. Once it reports calibration, start the benchmark from either the Mac
+   target. Once it reports calibration, start the benchmark from either the Mac
    control window or the transmitter toolbar.
 
 If the receiver never reports valid frames, stop the Mac benchmark, detect the

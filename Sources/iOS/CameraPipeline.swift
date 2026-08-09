@@ -54,7 +54,7 @@ final class CameraPipeline: NSObject, ObservableObject, AVCaptureVideoDataOutput
             DispatchQueue.main.async {
                 self?.isCalibrated = false
                 self?.isDetectingScreen = false
-                self?.status = "Aim at the complete white border"
+                self?.status = "Aim at the complete white target"
             }
         }
     }
@@ -66,7 +66,7 @@ final class CameraPipeline: NSObject, ObservableObject, AVCaptureVideoDataOutput
             DispatchQueue.main.async {
                 self?.isCalibrated = false
                 self?.isDetectingScreen = true
-                self?.status = "Detecting the screen…"
+                self?.status = "Detecting — hold the full target steady"
             }
         }
     }
@@ -107,7 +107,7 @@ final class CameraPipeline: NSObject, ObservableObject, AVCaptureVideoDataOutput
             DispatchQueue.main.async { [weak self] in
                 self?.isCalibrated = false
                 self?.isDetectingScreen = false
-                self?.status = "Screen not found — keep the full border visible"
+                self?.status = "Screen not found — keep the full white target visible"
             }
         case .calibrated:
             lockCameraForBenchmark()
@@ -153,7 +153,7 @@ final class CameraPipeline: NSObject, ObservableObject, AVCaptureVideoDataOutput
                     self.isRunning = true
                     self.captureFormat = formatSummary
                     self.previewDevice = self.cameraDevice
-                    self.status = "Aim at the complete white border"
+                    self.status = "Aim at the complete white target"
                 }
             } catch {
                 self.publishStatus("Camera setup failed: \(error.localizedDescription)")

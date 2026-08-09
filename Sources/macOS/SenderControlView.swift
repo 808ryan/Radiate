@@ -58,12 +58,12 @@ struct SenderControlView: View {
                     .buttonStyle(.borderedProminent)
                 }
 
-                Text(sender.isRunning ? "Sending deterministic test frames" : "Showing the calibration border")
+                Text(sender.isRunning ? "Sending deterministic test frames" : "Showing the white calibration target")
                     .foregroundStyle(sender.isRunning ? .green : .secondary)
             }
 
             Section("Before you start") {
-                Text("Make the transmitter window full screen, set the iPhone to the same profile, and keep the complete white border inside the camera view. Disable Night Shift and automatic brightness for repeatable results.")
+                Text("Make the transmitter window full screen, set the iPhone to the same profile, and keep the complete white calibration target inside the camera view. Disable Night Shift and automatic brightness for repeatable results.")
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

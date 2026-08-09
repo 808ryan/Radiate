@@ -29,7 +29,7 @@ final class OpticalDecoder {
     }
 
     func requestScreenDetection() {
-        screenDetectionDeadline = ProcessInfo.processInfo.systemUptime + 2.0
+        screenDetectionDeadline = ProcessInfo.processInfo.systemUptime + 3.0
         sampleMap = nil
         lastSequence = nil
     }
@@ -101,12 +101,12 @@ final class OpticalDecoder {
 
     private func detectScreen(in pixelBuffer: CVPixelBuffer) -> ScreenQuadrilateral? {
         let request = VNDetectRectanglesRequest()
-        request.maximumObservations = 1
-        request.minimumConfidence = 0.5
+        request.maximumObservations = 8
+        request.minimumConfidence = 0.3
         request.minimumAspectRatio = 0.35
         request.maximumAspectRatio = 1.0
-        request.minimumSize = 0.35
-        request.quadratureTolerance = 35
+        request.minimumSize = 0.25
+        request.quadratureTolerance = 40
 
         let handler = VNImageRequestHandler(
             cvPixelBuffer: pixelBuffer,
@@ -119,7 +119,11 @@ final class OpticalDecoder {
             return nil
         }
 
-        guard let rectangle = request.results?.first else { return nil }
+        guard let rectangle = request.results?.max(by: {
+            let leftArea = $0.boundingBox.width * $0.boundingBox.height
+            let rightArea = $1.boundingBox.width * $1.boundingBox.height
+            return leftArea < rightArea
+        }) else { return nil }
         let width = CGFloat(CVPixelBufferGetWidthOfPlane(pixelBuffer, 0))
         let height = CGFloat(CVPixelBufferGetHeightOfPlane(pixelBuffer, 0))
 
@@ -154,8 +158,8 @@ private struct SampleMap {
     ) {
         guard let homography = Homography(quadrilateral: quadrilateral) else { return nil }
 
-        // Vision generally returns the outer edge of the white border. The data
-        // begins slightly inside it; this margin avoids sampling the border.
+        // Vision returns the outer edge of the white calibration target. The
+        // running data begins slightly inside it, so avoid sampling that margin.
         let dataInset = 0.013
 
         func point(column: Int, row: Int) -> PixelPoint {
